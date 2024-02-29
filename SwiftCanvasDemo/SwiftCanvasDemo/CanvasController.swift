@@ -8,7 +8,9 @@
 import Foundation
 import UIKit
 
-class CanvasController: UIViewController, UIScrollViewDelegate {
+public class CanvasController: UIViewController, UIScrollViewDelegate {
+    
+    // MARK: - Default Constants
     
     private static let DEFAULT_CANVAS_WIDTH = 3000.0
     private static let DEFAULT_CANVAS_HEIGHT = 3000.0
@@ -18,9 +20,14 @@ class CanvasController: UIViewController, UIScrollViewDelegate {
     private static let DEFAULT_MAX_ZOOM_SCALE = 10.0
     private static let DEFAULT_SHOW_SCROLL_BARS = true
     
+    // MARK: - View Properties
+    
     private let scrollContainer = UIScrollView()
     private let canvasContainer = UIView()
     private let visibleImage = UIImageView()
+    
+    // MARK: - Canvas Properties
+    
     private var canvasSize = CGSize()
     private var viewSize: CGSize {
         return self.view.bounds.size
@@ -75,7 +82,7 @@ class CanvasController: UIViewController, UIScrollViewDelegate {
     
     // MARK: - View Loading Functions
     
-    override func viewDidLoad() {
+    public override func viewDidLoad() {
         super.viewDidLoad()
         
         // Setup properties
@@ -109,7 +116,7 @@ class CanvasController: UIViewController, UIScrollViewDelegate {
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
     }
     
-    override func viewDidLayoutSubviews() {
+    public override func viewDidLayoutSubviews() {
         self.visibleImage.frame = CGRect(origin: CGPoint(), size: self.viewSize)
         self.visibleImage.backgroundColor = .green
         
@@ -134,7 +141,7 @@ class CanvasController: UIViewController, UIScrollViewDelegate {
     
     // MARK: - Scroll Delegate Functions
     
-    internal func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+    public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.canvasContainer
     }
     
