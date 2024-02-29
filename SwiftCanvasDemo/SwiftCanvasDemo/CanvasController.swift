@@ -25,6 +25,17 @@ class CanvasController: UIViewController, UIScrollViewDelegate {
     private var viewSize: CGSize {
         return self.view.bounds.size
     }
+    private var zoomScale: CGFloat {
+        return self.scrollContainer.zoomScale
+    }
+    private var visibleRect: CGRect {
+        return CGRect(
+            x: self.scrollContainer.contentOffset.x/self.zoomScale,
+            y: self.scrollContainer.contentOffset.y/self.zoomScale,
+            width: self.scrollContainer.bounds.size.width/self.zoomScale,
+            height: self.scrollContainer.bounds.size.height/self.zoomScale
+        )
+    }
     
     // MARK: - Config Functions
     
