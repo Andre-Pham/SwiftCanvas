@@ -10,64 +10,102 @@ import UIKit
 
 class CanvasController: UIViewController, UIScrollViewDelegate {
     
-    private let scrollView = UIScrollView()
-    private let canvasView = UIView()
-    private let imageView = UIImageView()
+    private static let DEFAULT_CANVAS_WIDTH = 3000.0
+    private static let DEFAULT_CANVAS_HEIGHT = 3000.0
+    private static let DEFAULT_CANVAS_COLOR = UIColor.clear
+    private static let DEFAULT_BOUNCE = true
+    private static let DEFAULT_MIN_ZOOM_SCALE = 0.2
+    private static let DEFAULT_MAX_ZOOM_SCALE = 10.0
+    private static let DEFAULT_SHOW_SCROLL_BARS = true
     
-    private var canvasSize: CGSize {
+    private let scrollContainer = UIScrollView()
+    private let canvasContainer = UIView()
+    private let visibleImage = UIImageView()
+    private var canvasSize = CGSize()
+    private var viewSize: CGSize {
         return self.view.bounds.size
     }
+    
+    // MARK: - Config Functions
+    
+    public func setCanvasSize(to size: CGSize) -> Self {
+        self.canvasSize = size
+        self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
+        self.scrollContainer.contentOffset = CGPoint(x: size.width/2.0, y: size.height/2.0)
+        return self
+    }
+    
+    public func setCanvasBounce(to state: Bool) -> Self {
+        self.scrollContainer.alwaysBounceVertical = state
+        self.scrollContainer.alwaysBounceHorizontal = state
+        return self
+    }
+    
+    public func setCanvasBackgroundColor(to color: UIColor) -> Self {
+        self.view.backgroundColor = color
+        return self
+    }
+    
+    public func setMinZoomScale(to scale: Double) -> Self {
+        self.scrollContainer.minimumZoomScale = scale
+        return self
+    }
+    
+    public func setMaxZoomScale(to scale: Double) -> Self {
+        self.scrollContainer.maximumZoomScale = scale
+        return self
+    }
+    
+    public func setScrollBarVisibility(to visible: Bool) -> Self {
+        self.scrollContainer.showsVerticalScrollIndicator = visible
+        self.scrollContainer.showsHorizontalScrollIndicator = visible
+        return self
+    }
+    
+    // MARK: - View Loading Functions
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        self.view.backgroundColor = .red
+        // Setup properties
+        self.canvasSize = CGSize(width: Self.DEFAULT_CANVAS_WIDTH, height: Self.DEFAULT_CANVAS_HEIGHT)
+        self.view.backgroundColor = Self.DEFAULT_CANVAS_COLOR
         
-        self.scrollView.translatesAutoresizingMaskIntoConstraints = false
-        self.view.addSubview(self.scrollView)
+        // View hierarchy
+        self.view.addSubview(self.scrollContainer)
+        self.scrollContainer.addSubview(self.canvasContainer)
+        self.canvasContainer.addSubview(self.visibleImage)
+        
+        // Setup scroll container
+        self.scrollContainer.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            self.scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            self.scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            self.scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            self.scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            self.scrollContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            self.scrollContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            self.scrollContainer.topAnchor.constraint(equalTo: view.topAnchor),
+            self.scrollContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+        self.scrollContainer.delegate = self
+        self.scrollContainer.alwaysBounceVertical = Self.DEFAULT_BOUNCE
+        self.scrollContainer.alwaysBounceHorizontal = Self.DEFAULT_BOUNCE
+        self.scrollContainer.contentSize = self.canvasSize
+        self.scrollContainer.minimumZoomScale = Self.DEFAULT_MIN_ZOOM_SCALE
+        self.scrollContainer.maximumZoomScale = Self.DEFAULT_MAX_ZOOM_SCALE
+        self.scrollContainer.showsVerticalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
+        self.scrollContainer.showsHorizontalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
+        self.scrollContainer.contentOffset = CGPoint(x: Self.DEFAULT_CANVAS_WIDTH/2.0, y: Self.DEFAULT_CANVAS_HEIGHT/2.0)
         
-        self.scrollView.delegate = self
-        
-        self.scrollView.alwaysBounceVertical = true
-        self.scrollView.alwaysBounceHorizontal = true
-        
-        self.scrollView.contentSize = CGSize(width: 3000, height: 3000)
-        
-        self.scrollView.minimumZoomScale = 0.2
-        self.scrollView.maximumZoomScale = 10.0
-        
-        self.scrollView.showsVerticalScrollIndicator = false
-        self.scrollView.showsHorizontalScrollIndicator = false
-        
-        // This is where the user "starts" in the scroll view
-        self.scrollView.contentOffset = CGPoint(x: 1500, y: 1500)
-        
-        self.canvasView.translatesAutoresizingMaskIntoConstraints = false
-        self.scrollView.addSubview(self.canvasView)
-        NSLayoutConstraint.activate([
-            self.canvasView.widthAnchor.constraint(equalToConstant: 3000), // Match scrollView contentSize width
-            self.canvasView.heightAnchor.constraint(equalToConstant: 3000), // Match scrollView contentSize height
-            self.canvasView.topAnchor.constraint(equalTo: self.scrollView.topAnchor),
-            self.canvasView.leadingAnchor.constraint(equalTo: self.scrollView.leadingAnchor)
-        ])
-//        self.imageView.backgroundColor = .green
-        self.canvasView.addSubview(self.imageView)
+        // Setup canvas container
+        self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
     }
     
     override func viewDidLayoutSubviews() {
-        self.imageView.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
-        self.imageView.backgroundColor = .green
+        self.visibleImage.frame = CGRect(origin: CGPoint(), size: self.viewSize)
+        self.visibleImage.backgroundColor = .green
         
         
         
         
-        let renderer = UIGraphicsImageRenderer(size: self.canvasSize)
+        let renderer = UIGraphicsImageRenderer(size: self.viewSize)
 
         let img = renderer.image { ctx in
             let rectangle = CGRect(x: 0, y: 0, width: 100, height: 100)
@@ -80,11 +118,13 @@ class CanvasController: UIViewController, UIScrollViewDelegate {
             ctx.cgContext.drawPath(using: .fillStroke)
         }
 
-        self.imageView.image = img
+        self.visibleImage.image = img
     }
     
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return self.canvasView
+    // MARK: - Scroll Delegate Functions
+    
+    internal func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return self.canvasContainer
     }
     
 }
