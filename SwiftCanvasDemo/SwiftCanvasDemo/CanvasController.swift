@@ -26,7 +26,11 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private let canvasContainer = UIView()
     private let visibleImage = UIImageView()
     
-    // MARK: - Canvas Properties
+    // MARK: - Layer Properties
+    
+    public let layerManager = CanvasLayerManager()
+    
+    // MARK: - Rendering Properties
     
     private var canvasSize = CGSize()
     private var viewSize: CGSize {
@@ -117,32 +121,52 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public override func viewDidLayoutSubviews() {
-        self.visibleImage.frame = CGRect(origin: CGPoint(), size: self.viewSize)
-        self.visibleImage.backgroundColor = .green
-        
-        
-        
-        
+        self.refresh()
+    }
+    
+    // MARK: - Rendering Functions
+    
+    private func realignImage() {
+        self.visibleImage.frame = self.visibleRect
+    }
+    
+    private func redraw() {
         let renderer = UIGraphicsImageRenderer(size: self.viewSize)
-
-        let img = renderer.image { ctx in
-            let rectangle = CGRect(x: 0, y: 0, width: 100, height: 100)
-
-            ctx.cgContext.setFillColor(UIColor.red.cgColor)
-            ctx.cgContext.setStrokeColor(UIColor.black.cgColor)
-            ctx.cgContext.setLineWidth(10)
-
-            ctx.cgContext.addRect(rectangle)
-            ctx.cgContext.drawPath(using: .fillStroke)
+        let renderedImage = renderer.image { ctx in
+            ctx.cgContext.scaleBy(x: self.zoomScale, y: self.zoomScale)
+            let visibleRect = self.visibleRect
+            ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
+            self.layerManager.drawLayers(on: ctx.cgContext)
+            ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
         }
-
-        self.visibleImage.image = img
+        self.visibleImage.image = renderedImage
+    }
+    
+    public func refresh() {
+        self.realignImage()
+        self.redraw()
     }
     
     // MARK: - Scroll Delegate Functions
     
     public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.canvasContainer
+    }
+    
+    public func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        self.refresh()
+    }
+    
+    public func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        self.refresh()
+    }
+    
+    public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        self.refresh()
+    }
+    
+    public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        self.refresh()
     }
     
 }

@@ -6,13 +6,109 @@
 //
 
 import Foundation
+import SwiftMath
+import UIKit
+
+public class StrokeSettings {
+    
+    public var color: CGColor
+    public var cap: CGLineCap
+    public var width: Double
+    public var dash: (phase: CGFloat, lengths: [CGFloat])?
+    
+    public init(
+        color: CGColor = CGColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0),
+        cap: CGLineCap = .butt,
+        width: Double = 10.0,
+        dash: (phase: CGFloat, lengths: [CGFloat])? = nil
+    ) {
+        self.color = color
+        self.cap = cap
+        self.width = width
+        self.dash = dash
+    }
+    
+    internal func apply(to context: CGContext) {
+        context.setStrokeColor(self.color)
+        context.setLineCap(self.cap)
+        context.setLineWidth(self.width)
+        if let dash {
+            context.setLineDash(phase: dash.phase, lengths: dash.lengths)
+        }
+    }
+    
+}
+
+public protocol Primitive {
+    
+    func draw(on context: CGContext)
+    
+}
+
+public class LinePrimitive: Primitive {
+    
+    public var lineSegment: SMLineSegment
+    public var strokeSettings: StrokeSettings
+    
+    public init(lineSegment: SMLineSegment, strokeSettings: StrokeSettings) {
+        self.lineSegment = lineSegment
+        self.strokeSettings = strokeSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        context.saveGState()
+        self.strokeSettings.apply(to: context)
+        context.move(to: self.lineSegment.origin.cgPoint)
+        context.addLine(to: self.lineSegment.end.cgPoint)
+        context.drawPath(using: .stroke)
+        context.restoreGState()
+    }
+    
+}
+
+public class ArcPrimitive: Primitive {
+    
+    public var arc: SMArc
+    public var strokeSettings: StrokeSettings
+    
+    public init(arc: SMArc, strokeSettings: StrokeSettings) {
+        self.arc = arc
+        self.strokeSettings = strokeSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        context.saveGState()
+        self.strokeSettings.apply(to: context)
+        context.addArc(
+            center: self.arc.center.cgPoint,
+            radius: self.arc.radius,
+            startAngle: self.arc.startAngle.radians,
+            endAngle: self.arc.endAngle.radians,
+            clockwise: false
+        )
+        context.drawPath(using: .stroke)
+        context.restoreGState()
+    }
+    
+}
 
 public class CanvasLayer {
     
     private(set) var id: String
+    private var primitives = [Primitive]()
     
-    init(id: String = UUID().uuidString) {
+    public init(id: String = UUID().uuidString) {
         self.id = id
+    }
+    
+    public func addPrimitive(_ primitive: Primitive) {
+        self.primitives.append(primitive)
+    }
+    
+    internal func draw(on context: CGContext) {
+        for primitive in self.primitives {
+            primitive.draw(on: context)
+        }
     }
     
 }
@@ -22,6 +118,13 @@ public class CanvasLayerManager {
     private var layers = [Int: CanvasLayer]()
     private var layerPositions = [String: Int]()
     private(set) var layerCount = 0
+    
+    internal func drawLayers(on context: CGContext) {
+        for layerPosition in 0..<self.layerCount {
+            let layer = self.layers[layerPosition]!
+            layer.draw(on: context)
+        }
+    }
     
     public func addLayer(_ layer: CanvasLayer) {
         guard self.layerPositions[layer.id] == nil else {

@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import SwiftMath
 
 class ViewController: UIViewController {
     
@@ -31,6 +32,14 @@ class ViewController: UIViewController {
         
         // Step 4: Notify the Child View Controller
         self.canvasController.didMove(toParent: self)
+        
+        self.view.backgroundColor = .lightGray
+        
+        let mainLayer = CanvasLayer(id: "main")
+        self.canvasController.layerManager.addLayer(mainLayer)
+        let arc = SMArc(center: SMPoint(x: 200, y: 200), radius: 50, startAngle: SMAngle(degrees: 0), endAngle: SMAngle(degrees: 90))
+        let settings = StrokeSettings()
+        mainLayer.addPrimitive(ArcPrimitive(arc: arc, strokeSettings: settings))
     }
 
 
