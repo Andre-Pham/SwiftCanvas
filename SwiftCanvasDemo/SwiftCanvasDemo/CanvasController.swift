@@ -25,6 +25,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private let scrollContainer = UIScrollView()
     private let canvasContainer = UIView()
     private let viewportImage = UIImageView()
+    private let completeImage = UIImageView()
     
     // MARK: - Layer Properties
     
@@ -129,6 +130,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         // View hierarchy
         self.view.addSubview(self.scrollContainer)
         self.scrollContainer.addSubview(self.canvasContainer)
+        self.canvasContainer.addSubview(self.completeImage)
         self.canvasContainer.addSubview(self.viewportImage)
         
         // Setup scroll container
@@ -152,6 +154,9 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         // Setup canvas container
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
         
+        // Setup complete image
+        self.completeImage.frame = self.canvasContainer.frame
+        
         let temp = UIView(frame: CGRect(x: 0, y: 0, width: 200, height: 200))
         temp.backgroundColor = .red.withAlphaComponent(0.2)
         self.canvasContainer.addSubview(temp)
@@ -159,36 +164,60 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         let temp2 = UIView(frame: CGRect(x: 0, y: 3000 - 200, width: 200, height: 200))
         temp2.backgroundColor = .red.withAlphaComponent(0.2)
         self.canvasContainer.addSubview(temp2)
-        
-        self.viewportImage.layer.borderColor = UIColor.green.cgColor
-        self.viewportImage.layer.borderWidth = 20.0
     }
     
     public override func viewDidLayoutSubviews() {
-        self.refresh()
+        self.redraw()
+        self.refreshCanvas()
     }
     
     // MARK: - Rendering Functions
     
-    private func realignImage() {
+    private func redrawViewport() {
         self.viewportImage.frame = self.visibleArea
-    }
-    
-    private func redraw() {
-        let renderer = UIGraphicsImageRenderer(size: self.viewSize)
-        let renderedImage = renderer.image { ctx in
-            ctx.cgContext.scaleBy(x: self.zoomScale, y: self.zoomScale)
-            let visibleRect = self.visibleArea
-            ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
-            self.layerManager.drawLayers(on: ctx.cgContext)
-            ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
+        let visibleRect = self.visibleArea
+        let zoomScale = self.zoomScale
+        let viewSize = self.viewSize
+        DispatchQueue.global().async {
+            let renderer = UIGraphicsImageRenderer(size: viewSize)
+            let renderedImage = renderer.image { ctx in
+                ctx.cgContext.scaleBy(x: zoomScale, y: zoomScale)
+                ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
+                self.layerManager.drawLayers(on: ctx.cgContext)
+                ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
+            }
+            DispatchQueue.main.async {
+                self.viewportImage.image = renderedImage
+            }
         }
-        self.viewportImage.image = renderedImage
     }
     
-    public func refresh() {
-        self.realignImage()
-        self.redraw()
+    private func redrawComplete() {
+        let canvasSize = self.canvasSize
+        DispatchQueue.global().async {
+            let renderer = UIGraphicsImageRenderer(size: canvasSize)
+            let renderedImage = renderer.image { ctx in
+                self.layerManager.drawLayers(on: ctx.cgContext)
+            }
+            DispatchQueue.main.async {
+                self.completeImage.image = renderedImage
+            }
+        }
+    }
+    
+    public func redraw() {
+        self.redrawViewport()
+        self.redrawComplete()
+    }
+    
+    private func refreshCanvas() {
+        if isGreaterOrEqual(self.zoomScale, 1.0) {
+            self.redrawViewport()
+            self.completeImage.isHidden = true
+        } else {
+            self.viewportImage.image = nil
+            self.completeImage.isHidden = false
+        }
     }
     
     // MARK: - Scroll Delegate Functions
@@ -198,9 +227,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        if !self.visibleAreaOutOfBounds || true {
-            self.refresh()
-        }
+        self.refreshCanvas()
         
         // TODO: Clean up, make into a method
         let width = scrollView.bounds.size.width
@@ -213,9 +240,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if !self.visibleAreaOutOfBounds || true {
-            self.refresh()
-        }
+        self.refreshCanvas()
     }
     
 }
