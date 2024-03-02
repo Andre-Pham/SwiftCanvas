@@ -33,13 +33,22 @@ class ViewController: UIViewController {
         // Step 4: Notify the Child View Controller
         self.canvasController.didMove(toParent: self)
         
-        self.view.backgroundColor = .lightGray
+        self.canvasController.setCanvasBackgroundColor(to: .lightGray)
+        
+        let backgroundLayer = CanvasLayer(id: "background")
+        self.canvasController.layerManager.addLayer(backgroundLayer)
+        let line = SMLineSegment(origin: SMPoint(), end: SMPoint(x: 0, y: 3000))
+        backgroundLayer.addPrimitive(LinePrimitive(lineSegment: line, strokeSettings: StrokeSettings()))
         
         let mainLayer = CanvasLayer(id: "main")
         self.canvasController.layerManager.addLayer(mainLayer)
         let arc = SMArc(center: SMPoint(x: 200, y: 200), radius: 50, startAngle: SMAngle(degrees: 0), endAngle: SMAngle(degrees: 90))
         let settings = StrokeSettings()
         mainLayer.addPrimitive(ArcPrimitive(arc: arc, strokeSettings: settings))
+        
+        let arc2 = SMArc(center: SMPoint(x: 200, y: 3000 - 200), radius: 50, startAngle: SMAngle(degrees: 0), endAngle: SMAngle(degrees: 90))
+        let settings2 = StrokeSettings()
+        mainLayer.addPrimitive(ArcPrimitive(arc: arc2, strokeSettings: settings2))
     }
 
 

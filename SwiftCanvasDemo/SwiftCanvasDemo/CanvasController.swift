@@ -36,20 +36,43 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private var viewSize: CGSize {
         return self.view.bounds.size
     }
+    private var minZoomScale: CGFloat {
+        return self.scrollContainer.minimumZoomScale
+    }
+    private var maxZoomScale: CGFloat {
+        return self.scrollContainer.maximumZoomScale
+    }
     private var zoomScale: CGFloat {
         return self.scrollContainer.zoomScale
     }
     private var visibleRect: CGRect {
+        let width = self.scrollContainer.bounds.size.width/self.zoomScale
+        let height = self.scrollContainer.bounds.size.height/self.zoomScale
+        var x = self.scrollContainer.contentOffset.x/self.zoomScale
+        var y = self.scrollContainer.contentOffset.y/self.zoomScale
+        guard !self.outOfBounds else {
+            return CGRect(x: x, y: y, width: width, height: height)
+        }
+        if isGreater(x + width, self.canvasSize.width) {
+            x -= (x + width - self.canvasSize.width)
+        }
+        if isGreater(y + height, self.canvasSize.height) {
+            y -= (y + height - self.canvasSize.height)
+        }
         return CGRect(
-            x: self.scrollContainer.contentOffset.x/self.zoomScale,
-            y: self.scrollContainer.contentOffset.y/self.zoomScale,
-            width: self.scrollContainer.bounds.size.width/self.zoomScale,
-            height: self.scrollContainer.bounds.size.height/self.zoomScale
+            x: max(x, 0.0),
+            y: max(y, 0.0),
+            width: width,
+            height: height
         )
+    }
+    private var outOfBounds: Bool {
+        return isLess(self.zoomScale, self.minZoomScale)
     }
     
     // MARK: - Config Functions
     
+    @discardableResult
     public func setCanvasSize(to size: CGSize) -> Self {
         self.canvasSize = size
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
@@ -57,27 +80,37 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         return self
     }
     
+    @discardableResult
     public func setCanvasBounce(to state: Bool) -> Self {
         self.scrollContainer.alwaysBounceVertical = state
         self.scrollContainer.alwaysBounceHorizontal = state
         return self
     }
     
+    @discardableResult
     public func setCanvasBackgroundColor(to color: UIColor) -> Self {
         self.view.backgroundColor = color
         return self
     }
     
+    @discardableResult
     public func setMinZoomScale(to scale: Double) -> Self {
         self.scrollContainer.minimumZoomScale = scale
         return self
     }
     
+    @discardableResult
     public func setMaxZoomScale(to scale: Double) -> Self {
         self.scrollContainer.maximumZoomScale = scale
         return self
     }
     
+    @discardableResult
+    public func matchMinZoomScaleToCanvasSize() -> Self {
+        return self.setMinZoomScale(to: self.viewSize.height/min(self.canvasSize.width, self.canvasSize.height))
+    }
+    
+    @discardableResult
     public func setScrollBarVisibility(to visible: Bool) -> Self {
         self.scrollContainer.showsVerticalScrollIndicator = visible
         self.scrollContainer.showsHorizontalScrollIndicator = visible
@@ -118,6 +151,17 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         
         // Setup canvas container
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
+        
+        let temp = UIView(frame: CGRect(x: 0, y: 0, width: 200, height: 200))
+        temp.backgroundColor = .red.withAlphaComponent(0.2)
+        self.canvasContainer.addSubview(temp)
+        
+        let temp2 = UIView(frame: CGRect(x: 0, y: 3000 - 200, width: 200, height: 200))
+        temp2.backgroundColor = .red.withAlphaComponent(0.2)
+        self.canvasContainer.addSubview(temp2)
+        
+        self.visibleImage.layer.borderColor = UIColor.green.cgColor
+        self.visibleImage.layer.borderWidth = 20.0
     }
     
     public override func viewDidLayoutSubviews() {
@@ -154,19 +198,24 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        self.refresh()
-    }
-    
-    public func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
-        self.refresh()
+        if !self.outOfBounds || true {
+            self.refresh()
+        }
+        
+        // TODO: Clean up, make into a method
+        let width = scrollView.bounds.size.width
+        let height = scrollView.bounds.size.height
+        let contentWidth = scrollView.contentSize.width
+        let contentHeight = scrollView.contentSize.height
+        let horizontalInset = max(0, (width - contentWidth) / 2)
+        let verticalInset = max(0, (height - contentHeight) / 2)
+        scrollView.contentInset = UIEdgeInsets(top: verticalInset, left: horizontalInset, bottom: verticalInset, right: horizontalInset)
     }
     
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        self.refresh()
-    }
-    
-    public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        self.refresh()
+        if !self.outOfBounds || true {
+            self.refresh()
+        }
     }
     
 }
