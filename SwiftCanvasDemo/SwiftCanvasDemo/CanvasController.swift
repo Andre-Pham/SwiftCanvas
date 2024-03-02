@@ -107,7 +107,10 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     public func setCanvasSize(to size: CGSize) -> Self {
         self.canvasSize = size
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
-        self.scrollContainer.contentOffset = CGPoint(x: size.width/2.0, y: size.height/2.0)
+        self.scrollContainer.contentOffset = CGPoint(
+            x: size.width/2.0 - self.viewSize.width/2.0,
+            y: size.height/2.0 - self.viewSize.height/2.0
+        )
         return self
     }
     
@@ -179,7 +182,6 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         self.scrollContainer.maximumZoomScale = Self.DEFAULT_MAX_ZOOM_SCALE
         self.scrollContainer.showsVerticalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
         self.scrollContainer.showsHorizontalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
-        self.scrollContainer.contentOffset = CGPoint(x: Self.DEFAULT_CANVAS_WIDTH/2.0, y: Self.DEFAULT_CANVAS_HEIGHT/2.0)
         
         // Setup canvas container
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
@@ -197,6 +199,10 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public override func viewDidLayoutSubviews() {
+        self.scrollContainer.contentOffset = CGPoint(
+            x: Self.DEFAULT_CANVAS_WIDTH/2.0 - self.viewSize.width/2.0,
+            y: Self.DEFAULT_CANVAS_HEIGHT/2.0 - self.viewSize.height/2.0
+        )
         self.redraw()
         self.refreshCanvas()
     }
