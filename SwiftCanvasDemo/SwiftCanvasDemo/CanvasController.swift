@@ -45,12 +45,12 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private var zoomScale: CGFloat {
         return self.scrollContainer.zoomScale
     }
-    private var visibleRect: CGRect {
+    private var visibleArea: CGRect {
         let width = self.scrollContainer.bounds.size.width/self.zoomScale
         let height = self.scrollContainer.bounds.size.height/self.zoomScale
         var x = self.scrollContainer.contentOffset.x/self.zoomScale
         var y = self.scrollContainer.contentOffset.y/self.zoomScale
-        guard !self.outOfBounds else {
+        guard !self.visibleAreaOutOfBounds else {
             return CGRect(x: x, y: y, width: width, height: height)
         }
         if isGreater(x + width, self.canvasSize.width) {
@@ -66,7 +66,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
             height: height
         )
     }
-    private var outOfBounds: Bool {
+    private var visibleAreaOutOfBounds: Bool {
         return isLess(self.zoomScale, self.minZoomScale)
     }
     
@@ -171,14 +171,14 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     // MARK: - Rendering Functions
     
     private func realignImage() {
-        self.visibleImage.frame = self.visibleRect
+        self.visibleImage.frame = self.visibleArea
     }
     
     private func redraw() {
         let renderer = UIGraphicsImageRenderer(size: self.viewSize)
         let renderedImage = renderer.image { ctx in
             ctx.cgContext.scaleBy(x: self.zoomScale, y: self.zoomScale)
-            let visibleRect = self.visibleRect
+            let visibleRect = self.visibleArea
             ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
             self.layerManager.drawLayers(on: ctx.cgContext)
             ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
@@ -198,7 +198,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        if !self.outOfBounds || true {
+        if !self.visibleAreaOutOfBounds || true {
             self.refresh()
         }
         
@@ -213,7 +213,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if !self.outOfBounds || true {
+        if !self.visibleAreaOutOfBounds || true {
             self.refresh()
         }
     }
