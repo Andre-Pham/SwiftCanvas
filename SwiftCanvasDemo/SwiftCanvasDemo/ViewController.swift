@@ -49,6 +49,9 @@ class ViewController: UIViewController {
         let arc2 = SMArc(center: SMPoint(x: 200, y: 3000 - 200), radius: 50, startAngle: SMAngle(degrees: 0), endAngle: SMAngle(degrees: 90))
         let settings2 = StrokeSettings()
         mainLayer.addPrimitive(ArcPrimitive(arc: arc2, strokeSettings: settings2))
+        
+        let origin = SMArc(center: self.canvasController.canvasOrigin, radius: 10, startAngle: SMAngle(), endAngle: SMAngle(degrees: 359))
+        mainLayer.addPrimitive(ArcPrimitive(arc: origin, strokeSettings: StrokeSettings()))
     }
 
 

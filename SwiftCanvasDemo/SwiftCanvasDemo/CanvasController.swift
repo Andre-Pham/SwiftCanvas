@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import SwiftMath
 
 public class CanvasController: UIViewController, UIScrollViewDelegate {
     
@@ -69,6 +70,35 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     private var visibleAreaOutOfBounds: Bool {
         return isLess(self.zoomScale, self.minZoomScale)
+    }
+    
+    // MARK: - Public Properties
+    
+    public var canvasBox: SMRect {
+        return SMRect(minX: 0.0, maxX: self.canvasSize.width, minY: 0.0, maxY: self.canvasSize.height)
+    }
+    public var canvasOrigin: SMPoint {
+        return SMPoint(x: self.canvasSize.width/2.0, y: self.canvasSize.height/2.0)
+    }
+    public var canvasLeftBorder: SMLineSegment {
+        return SMLineSegment(origin: SMPoint(), end: SMPoint(x: 0.0, y: self.canvasSize.height))
+    }
+    public var canvasRightBorder: SMLineSegment {
+        return SMLineSegment(origin: SMPoint(x: self.canvasSize.width, y: 0), end: SMPoint(x: self.canvasSize.width, y: self.canvasSize.height))
+    }
+    public var canvasTopBorder: SMLineSegment {
+        return SMLineSegment(origin: SMPoint(), end: SMPoint(x: self.canvasSize.width, y: 0.0))
+    }
+    public var canvasBottomBorder: SMLineSegment {
+        return SMLineSegment(origin: SMPoint(x: 0.0, y: self.canvasSize.height), end: SMPoint(x: self.canvasSize.width, y: self.canvasSize.height))
+    }
+    public var canvasBorder: SMPolygon {
+        return SMPolygon(vertices: [
+            SMPoint(x: 0.0, y: 0.0),
+            SMPoint(x: 0.0, y: self.canvasSize.height),
+            SMPoint(x: self.canvasSize.width, y: self.canvasSize.height),
+            SMPoint(x: self.canvasSize.width, y: 0.0)
+        ])
     }
     
     // MARK: - Config Functions
