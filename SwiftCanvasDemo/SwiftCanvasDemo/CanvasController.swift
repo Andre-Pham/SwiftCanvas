@@ -24,7 +24,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     
     private let scrollContainer = UIScrollView()
     private let canvasContainer = UIView()
-    private let visibleImage = UIImageView()
+    private let viewportImage = UIImageView()
     
     // MARK: - Layer Properties
     
@@ -129,7 +129,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         // View hierarchy
         self.view.addSubview(self.scrollContainer)
         self.scrollContainer.addSubview(self.canvasContainer)
-        self.canvasContainer.addSubview(self.visibleImage)
+        self.canvasContainer.addSubview(self.viewportImage)
         
         // Setup scroll container
         self.scrollContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -160,8 +160,8 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         temp2.backgroundColor = .red.withAlphaComponent(0.2)
         self.canvasContainer.addSubview(temp2)
         
-        self.visibleImage.layer.borderColor = UIColor.green.cgColor
-        self.visibleImage.layer.borderWidth = 20.0
+        self.viewportImage.layer.borderColor = UIColor.green.cgColor
+        self.viewportImage.layer.borderWidth = 20.0
     }
     
     public override func viewDidLayoutSubviews() {
@@ -171,7 +171,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     // MARK: - Rendering Functions
     
     private func realignImage() {
-        self.visibleImage.frame = self.visibleArea
+        self.viewportImage.frame = self.visibleArea
     }
     
     private func redraw() {
@@ -183,7 +183,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
             self.layerManager.drawLayers(on: ctx.cgContext)
             ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
         }
-        self.visibleImage.image = renderedImage
+        self.viewportImage.image = renderedImage
     }
     
     public func refresh() {
