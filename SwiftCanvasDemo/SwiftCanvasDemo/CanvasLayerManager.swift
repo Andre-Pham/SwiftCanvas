@@ -39,6 +39,20 @@ public class StrokeSettings {
     
 }
 
+public class FillSettings {
+    
+    public var color: CGColor
+    
+    public init(color: CGColor = CGColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)) {
+        self.color = color
+    }
+    
+    internal func apply(to context: CGContext) {
+        context.setFillColor(self.color)
+    }
+    
+}
+
 public protocol Primitive {
     
     func draw(on context: CGContext)
@@ -58,8 +72,7 @@ public class LinePrimitive: Primitive {
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.move(to: self.lineSegment.origin.cgPoint)
-        context.addLine(to: self.lineSegment.end.cgPoint)
+        context.addPath(self.lineSegment.cgPath)
         context.drawPath(using: .stroke)
         context.restoreGState()
     }
@@ -79,14 +92,228 @@ public class ArcPrimitive: Primitive {
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.addArc(
-            center: self.arc.center.cgPoint,
-            radius: self.arc.radius,
-            startAngle: self.arc.startAngle.radians,
-            endAngle: self.arc.endAngle.radians,
-            clockwise: false
-        )
+        context.addPath(self.arc.cgPath)
         context.drawPath(using: .stroke)
+        context.restoreGState()
+    }
+    
+}
+
+public class RectPrimitive: Primitive {
+    
+    public var rect: SMRect
+    public var strokeSettings: StrokeSettings?
+    public var fillSettings: FillSettings?
+    
+    public init(rect: SMRect, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
+        self.rect = rect
+        self.strokeSettings = strokeSettings
+        self.fillSettings = fillSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        guard !(self.strokeSettings == nil && self.fillSettings == nil) else {
+            return
+        }
+        context.saveGState()
+        self.strokeSettings?.apply(to: context)
+        self.fillSettings?.apply(to: context)
+        context.addRect(self.rect.cgRect)
+        if self.strokeSettings != nil && self.fillSettings != nil {
+            context.drawPath(using: .fillStroke)
+        } else if self.strokeSettings != nil {
+            context.drawPath(using: .stroke)
+        } else {
+            context.drawPath(using: .fill)
+        }
+        context.restoreGState()
+    }
+    
+}
+
+public class PolygonPrimitive: Primitive {
+    
+    public var polygon: SMPolygon
+    public var strokeSettings: StrokeSettings?
+    public var fillSettings: FillSettings?
+    
+    public init(polygon: SMPolygon, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
+        self.polygon = polygon
+        self.strokeSettings = strokeSettings
+        self.fillSettings = fillSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        guard !(self.strokeSettings == nil && self.fillSettings == nil) else {
+            return
+        }
+        context.saveGState()
+        self.strokeSettings?.apply(to: context)
+        self.fillSettings?.apply(to: context)
+        context.addPath(self.polygon.cgPath)
+        if self.strokeSettings != nil && self.fillSettings != nil {
+            context.drawPath(using: .fillStroke)
+        } else if self.strokeSettings != nil {
+            context.drawPath(using: .stroke)
+        } else {
+            context.drawPath(using: .fill)
+        }
+        context.restoreGState()
+    }
+    
+}
+
+public class PolylinePrimitive: Primitive {
+    
+    public var polyline: SMPolyline
+    public var strokeSettings: StrokeSettings
+    
+    public init(polyline: SMPolyline, strokeSettings: StrokeSettings) {
+        self.polyline = polyline
+        self.strokeSettings = strokeSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        context.saveGState()
+        self.strokeSettings.apply(to: context)
+        context.addPath(self.polyline.cgPath)
+        context.drawPath(using: .stroke)
+        context.restoreGState()
+    }
+    
+}
+
+public class CurvilinearPrimitive: Primitive {
+    
+    public var curvilinear: SMCurvilinearEdges
+    public var strokeSettings: StrokeSettings?
+    public var fillSettings: FillSettings?
+    
+    init(curvilinear: SMCurvilinearEdges, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
+        self.curvilinear = curvilinear
+        self.strokeSettings = strokeSettings
+        self.fillSettings = fillSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        guard !(self.strokeSettings == nil && self.fillSettings == nil) else {
+            return
+        }
+        context.saveGState()
+        self.strokeSettings?.apply(to: context)
+        self.fillSettings?.apply(to: context)
+        context.addPath(self.curvilinear.cgPath)
+        if self.strokeSettings != nil && self.fillSettings != nil {
+            context.drawPath(using: .fillStroke)
+        } else if self.strokeSettings != nil {
+            context.drawPath(using: .stroke)
+        } else {
+            context.drawPath(using: .fill)
+        }
+        context.restoreGState()
+    }
+    
+}
+
+public class BezierCurvePrimitive: Primitive {
+    
+    public var bezierCurve: SMBezierCurve
+    public var strokeSettings: StrokeSettings
+    
+    public init(bezierCurve: SMBezierCurve, strokeSettings: StrokeSettings) {
+        self.bezierCurve = bezierCurve
+        self.strokeSettings = strokeSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        context.saveGState()
+        self.strokeSettings.apply(to: context)
+        context.addPath(self.bezierCurve.cgPath)
+        context.drawPath(using: .stroke)
+        context.restoreGState()
+    }
+    
+}
+
+public class QuadCurvePrimitive: Primitive {
+    
+    public var quadCurve: SMQuadCurve
+    public var strokeSettings: StrokeSettings
+    
+    public init(quadCurve: SMQuadCurve, strokeSettings: StrokeSettings) {
+        self.quadCurve = quadCurve
+        self.strokeSettings = strokeSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        context.saveGState()
+        self.strokeSettings.apply(to: context)
+        context.addPath(self.quadCurve.cgPath)
+        context.drawPath(using: .stroke)
+        context.restoreGState()
+    }
+    
+}
+
+public class EllipsePrimitive: Primitive {
+    
+    public var ellipse: SMEllipse
+    public var strokeSettings: StrokeSettings?
+    public var fillSettings: FillSettings?
+    
+    init(ellipse: SMEllipse, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
+        self.ellipse = ellipse
+        self.strokeSettings = strokeSettings
+        self.fillSettings = fillSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        guard !(self.strokeSettings == nil && self.fillSettings == nil) else {
+            return
+        }
+        context.saveGState()
+        self.strokeSettings?.apply(to: context)
+        self.fillSettings?.apply(to: context)
+        context.addPath(self.ellipse.cgPath)
+        if self.strokeSettings != nil && self.fillSettings != nil {
+            context.drawPath(using: .fillStroke)
+        } else if self.strokeSettings != nil {
+            context.drawPath(using: .stroke)
+        } else {
+            context.drawPath(using: .fill)
+        }
+        context.restoreGState()
+    }
+    
+}
+
+public class HexagonPrimitive: Primitive {
+    
+    public var hexagon: SMHexagon
+    public var strokeSettings: StrokeSettings?
+    public var fillSettings: FillSettings?
+    
+    init(hexagon: SMHexagon, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
+        self.hexagon = hexagon
+        self.strokeSettings = strokeSettings
+        self.fillSettings = fillSettings
+    }
+    
+    public func draw(on context: CGContext) {
+        guard !(self.strokeSettings == nil && self.fillSettings == nil) else {
+            return
+        }
+        context.saveGState()
+        self.strokeSettings?.apply(to: context)
+        self.fillSettings?.apply(to: context)
+        context.addPath(self.hexagon.cgPath)
+        if self.strokeSettings != nil && self.fillSettings != nil {
+            context.drawPath(using: .fillStroke)
+        } else if self.strokeSettings != nil {
+            context.drawPath(using: .stroke)
+        } else {
+            context.drawPath(using: .fill)
+        }
         context.restoreGState()
     }
     
