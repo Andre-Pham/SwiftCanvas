@@ -10,6 +10,7 @@ import SwiftMath
 
 class ViewController: UIViewController {
     
+    private let button = LimeButton()
     private let canvasController = CanvasController()
 
     override func viewDidLoad() {
@@ -37,8 +38,8 @@ class ViewController: UIViewController {
         
         let backgroundLayer = CanvasLayer(id: "background")
         self.canvasController.layerManager.addLayer(backgroundLayer)
-        let line = SMLineSegment(origin: SMPoint(), end: SMPoint(x: 0, y: 3000))
-        backgroundLayer.addPrimitive(LinePrimitive(lineSegment: line, strokeSettings: StrokeSettings()))
+        let box = self.canvasController.canvasBox
+        backgroundLayer.addPrimitive(RectPrimitive(rect: box, strokeSettings: StrokeSettings(), fillSettings: FillSettings()))
         
         let mainLayer = CanvasLayer(id: "main")
         self.canvasController.layerManager.addLayer(mainLayer)
@@ -52,6 +53,15 @@ class ViewController: UIViewController {
         
         let origin = SMArc(center: self.canvasController.canvasOrigin, radius: 10, startAngle: SMAngle(), endAngle: SMAngle(degrees: 359))
         mainLayer.addPrimitive(ArcPrimitive(arc: origin, strokeSettings: StrokeSettings()))
+        
+        LimeView(self.view).addSubview(self.button)
+        self.button
+            .setLabel(to: "Do Something")
+            .constrainBottom()
+            .constrainCenterHorizontal()
+            .setOnTap({
+                self.canvasController.zoom(to: self.canvasController.canvasBox, animated: true)
+            })
     }
 
 

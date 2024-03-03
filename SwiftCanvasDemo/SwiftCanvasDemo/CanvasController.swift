@@ -47,6 +47,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private var zoomScale: CGFloat {
         return self.scrollContainer.zoomScale
     }
+    private var lastRefreshZoomScale = 1.0
     private var visibleArea: CGRect {
         let width = self.scrollContainer.bounds.size.width/self.zoomScale
         let height = self.scrollContainer.bounds.size.height/self.zoomScale
@@ -182,6 +183,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         self.scrollContainer.maximumZoomScale = Self.DEFAULT_MAX_ZOOM_SCALE
         self.scrollContainer.showsVerticalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
         self.scrollContainer.showsHorizontalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
+        self.lastRefreshZoomScale = self.zoomScale
         
         // Setup canvas container
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
@@ -212,6 +214,19 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private func redrawViewport() {
         self.viewportImage.frame = self.visibleArea
         let visibleRect = self.visibleArea
+        let renderer = UIGraphicsImageRenderer(size: self.viewSize)
+        let renderedImage = renderer.image { ctx in
+            ctx.cgContext.scaleBy(x: self.zoomScale, y: self.zoomScale)
+            ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
+            self.layerManager.drawLayers(on: ctx.cgContext)
+            ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
+        }
+        self.viewportImage.image = renderedImage
+    }
+    
+    private func redrawViewportAsync() {
+        self.viewportImage.frame = self.visibleArea
+        let visibleRect = self.visibleArea
         let zoomScale = self.zoomScale
         let viewSize = self.viewSize
         DispatchQueue.global().async {
@@ -228,7 +243,7 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         }
     }
     
-    private func redrawComplete() {
+    private func redrawCompleteAsync() {
         let canvasSize = self.canvasSize
         DispatchQueue.global().async {
             let renderer = UIGraphicsImageRenderer(size: canvasSize)
@@ -242,21 +257,27 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     }
     
     public func redraw() {
-        self.redrawViewport()
-        self.redrawComplete()
+        self.redrawViewportAsync()
+        self.redrawCompleteAsync()
     }
     
     private func refreshCanvas() {
+        let changedRenderingModeSinceLastRefresh = isGreaterOrEqual(self.lastRefreshZoomScale, 1.0) != isGreaterOrEqual(self.zoomScale, 1.0)
         if isGreaterOrEqual(self.zoomScale, 1.0) {
-            self.redrawViewport()
-            self.completeImage.isHidden = true
-        } else {
+            if changedRenderingModeSinceLastRefresh {
+                self.redrawViewport()
+                self.completeImage.isHidden = true
+            } else {
+                self.redrawViewportAsync()
+            }
+        } else if changedRenderingModeSinceLastRefresh {
             self.viewportImage.image = nil
             self.completeImage.isHidden = false
         }
+        self.lastRefreshZoomScale = self.zoomScale
     }
     
-    // MARK: - Scroll Delegate Functions
+    // MARK: - Scroll and Zoom Functions
     
     public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.canvasContainer
@@ -277,6 +298,18 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         self.refreshCanvas()
+    }
+    
+    public func scrollTo(_ position: SMPoint, animated: Bool) {
+        self.scrollContainer.setContentOffset(position.cgPoint, animated: animated)
+    }
+    
+    public func zoomTo(scale: Double, animated: Bool) {
+        self.scrollContainer.setZoomScale(scale, animated: animated)
+    }
+    
+    public func zoom(to area: SMRect, animated: Bool) {
+        self.scrollContainer.zoom(to: area.cgRect, animated: animated)
     }
     
 }
