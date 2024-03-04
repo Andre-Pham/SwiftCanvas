@@ -47,7 +47,6 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     private var zoomScale: CGFloat {
         return self.scrollContainer.zoomScale
     }
-    private var lastRefreshZoomScale = 1.0
     private var visibleArea: CGRect {
         let width = self.scrollContainer.bounds.size.width/self.zoomScale
         let height = self.scrollContainer.bounds.size.height/self.zoomScale
@@ -102,6 +101,11 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         ])
     }
     
+    // MARK: - Hit Target Callbacks
+    
+    private lazy var onHitTargetTapped: ((_ id: String) -> Void)? = nil
+    private lazy var onHitTargetReleased: ((_ id: String) -> Void)? = nil
+    
     // MARK: - Config Functions
     
     @discardableResult
@@ -152,6 +156,18 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         return self
     }
     
+    @discardableResult
+    public func setOnHitTargetTapped(_ callback: ((_ id: String) -> Void)?) -> Self {
+        self.onHitTargetTapped = callback
+        return self
+    }
+    
+    @discardableResult
+    public func setOnHitTargetReleased(_ callback: ((_ id: String) -> Void)?) -> Self {
+        self.onHitTargetReleased = callback
+        return self
+    }
+    
     // MARK: - View Loading Functions
     
     public override func viewDidLoad() {
@@ -183,10 +199,17 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         self.scrollContainer.maximumZoomScale = Self.DEFAULT_MAX_ZOOM_SCALE
         self.scrollContainer.showsVerticalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
         self.scrollContainer.showsHorizontalScrollIndicator = Self.DEFAULT_SHOW_SCROLL_BARS
-        self.lastRefreshZoomScale = self.zoomScale
         
         // Setup canvas container
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
+        
+        // Setup layer manager callbacks
+        self.layerManager.onTap = { id in
+            self.onHitTargetTapped?(id)
+        }
+        self.layerManager.onRelease = { id in
+            self.onHitTargetReleased?(id)
+        }
         
         // Setup complete image
         self.completeImage.frame = self.canvasContainer.frame
@@ -211,10 +234,12 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     
     // MARK: - Rendering Functions
     
-    private func redrawViewport() {
+    private func redrawViewport(quality: Double) {
         self.viewportImage.frame = self.visibleArea
         let visibleRect = self.visibleArea
-        let renderer = UIGraphicsImageRenderer(size: self.viewSize)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale *= quality
+        let renderer = UIGraphicsImageRenderer(size: self.viewSize, format: format)
         let renderedImage = renderer.image { ctx in
             ctx.cgContext.scaleBy(x: self.zoomScale, y: self.zoomScale)
             ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
@@ -256,25 +281,26 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         }
     }
     
+    private func redrawHitTargets() {
+        self.layerManager.eraseHitTargets()
+        self.layerManager.drawHitTargets(to: self.canvasContainer)
+    }
+    
     public func redraw() {
-        self.redrawViewportAsync()
         self.redrawCompleteAsync()
+        self.redrawHitTargets()
+        self.refreshCanvas()
     }
     
     private func refreshCanvas() {
-        let changedRenderingModeSinceLastRefresh = isGreaterOrEqual(self.lastRefreshZoomScale, 1.0) != isGreaterOrEqual(self.zoomScale, 1.0)
         if isGreaterOrEqual(self.zoomScale, 1.0) {
-            if changedRenderingModeSinceLastRefresh {
-                self.redrawViewport()
-                self.completeImage.isHidden = true
-            } else {
-                self.redrawViewportAsync()
-            }
-        } else if changedRenderingModeSinceLastRefresh {
+            self.redrawViewport(quality: 0.4)
+            self.redrawViewportAsync()
+            self.completeImage.isHidden = true
+        } else {
             self.viewportImage.image = nil
             self.completeImage.isHidden = false
         }
-        self.lastRefreshZoomScale = self.zoomScale
     }
     
     // MARK: - Scroll and Zoom Functions

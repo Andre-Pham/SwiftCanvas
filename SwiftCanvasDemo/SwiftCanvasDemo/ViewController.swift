@@ -11,6 +11,7 @@ import SwiftMath
 class ViewController: UIViewController {
     
     private let button = LimeButton()
+    private let button2 = LimeButton()
     private let canvasController = CanvasController()
 
     override func viewDidLoad() {
@@ -51,8 +52,9 @@ class ViewController: UIViewController {
         let settings2 = StrokeSettings()
         mainLayer.addPrimitive(ArcPrimitive(arc: arc2, strokeSettings: settings2))
         
-        let origin = SMArc(center: self.canvasController.canvasOrigin, radius: 10, startAngle: SMAngle(), endAngle: SMAngle(degrees: 359))
-        mainLayer.addPrimitive(ArcPrimitive(arc: origin, strokeSettings: StrokeSettings()))
+        let origin = SMEllipse(boundingBox: SMRect(center: self.canvasController.canvasOrigin, width: 50, height: 50))
+        let originFillSettings = FillSettings(color: UIColor.blue.cgColor)
+        mainLayer.addPrimitive(EllipsePrimitive(ellipse: origin, strokeSettings: StrokeSettings(), fillSettings: originFillSettings))
         
         LimeView(self.view).addSubview(self.button)
         self.button
@@ -60,9 +62,40 @@ class ViewController: UIViewController {
             .constrainBottom()
             .constrainCenterHorizontal()
             .setOnTap({
-                self.canvasController.zoom(to: self.canvasController.canvasBox, animated: true)
+                if self.colorState {
+                    originFillSettings.color = UIColor.blue.cgColor
+                } else {
+                    originFillSettings.color = UIColor.systemPink.cgColor
+                }
+                self.colorState.toggle()
+                self.canvasController.redraw()
             })
+        
+        self.view.addSubview(self.button2.view)
+        self.button2
+            .setLabel(to: "Test 1")
+            .constrainToRightSide(of: self.button, padding: 50)
+            .constrainBottom()
+            .setOnTap({
+                // Do nothing
+            })
+        
+        let hitTarget = HitBox(id: "origin", box: origin.boundingBox)
+        self.canvasController.layerManager.addHitTarget(hitTarget)
+        
+        self.canvasController.setOnHitTargetTapped({ id in
+            print("\(id) tapped!")
+            if self.colorState {
+                originFillSettings.color = UIColor.blue.cgColor
+            } else {
+                originFillSettings.color = UIColor.systemPink.cgColor
+            }
+            self.colorState.toggle()
+            self.canvasController.redraw()
+        })
     }
+    
+    private var colorState = false
 
 
 }
