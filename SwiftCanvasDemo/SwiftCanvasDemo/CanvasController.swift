@@ -34,6 +34,8 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
     
     // MARK: - Rendering Properties
     
+    private var viewportAsyncActiveID = 0
+    private var threadCount = 0
     private var canvasSize = CGSize()
     private var viewSize: CGSize {
         return self.view.bounds.size
@@ -243,13 +245,19 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         let renderedImage = renderer.image { ctx in
             ctx.cgContext.scaleBy(x: self.zoomScale, y: self.zoomScale)
             ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
-            self.layerManager.drawLayers(on: ctx.cgContext)
+            self.layerManager.drawLayers(on: ctx.cgContext, canvasRect: visibleRect)
             ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
         }
         self.viewportImage.image = renderedImage
     }
     
     private func redrawViewportAsync() {
+        guard self.threadCount < 3 else {
+            return
+        }
+        self.viewportAsyncActiveID = (self.viewportAsyncActiveID + 1)%1000
+        let viewportAsyncID = self.viewportAsyncActiveID
+        self.threadCount += 1
         self.viewportImage.frame = self.visibleArea
         let visibleRect = self.visibleArea
         let zoomScale = self.zoomScale
@@ -259,24 +267,37 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
             let renderedImage = renderer.image { ctx in
                 ctx.cgContext.scaleBy(x: zoomScale, y: zoomScale)
                 ctx.cgContext.translateBy(x: -visibleRect.origin.x, y: -visibleRect.origin.y)
-                self.layerManager.drawLayers(on: ctx.cgContext)
+                guard viewportAsyncID == self.viewportAsyncActiveID else {
+                    self.threadCount -= 1
+                    return
+                }
+                self.layerManager.drawLayers(on: ctx.cgContext, canvasRect: visibleRect) {
+                    // Layer was completed callback
+                    // Return value indicates if we should end early
+                    return viewportAsyncID != self.viewportAsyncActiveID
+                }
                 ctx.cgContext.translateBy(x: visibleRect.origin.x, y: visibleRect.origin.y)
             }
             DispatchQueue.main.async {
-                self.viewportImage.image = renderedImage
+                if viewportAsyncID == self.viewportAsyncActiveID {
+                    self.viewportImage.image = renderedImage
+                }
+                self.threadCount -= 1
             }
         }
     }
     
     private func redrawCompleteAsync() {
+        self.threadCount += 1
         let canvasSize = self.canvasSize
         DispatchQueue.global().async {
             let renderer = UIGraphicsImageRenderer(size: canvasSize)
             let renderedImage = renderer.image { ctx in
-                self.layerManager.drawLayers(on: ctx.cgContext)
+                self.layerManager.drawLayers(on: ctx.cgContext, canvasRect: nil)
             }
             DispatchQueue.main.async {
                 self.completeImage.image = renderedImage
+                self.threadCount -= 1
             }
         }
     }

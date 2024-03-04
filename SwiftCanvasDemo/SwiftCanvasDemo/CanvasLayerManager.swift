@@ -89,17 +89,20 @@ public class FillSettings {
 
 public protocol Primitive {
     
+    var boundingBox: CGRect? { get }
     func draw(on context: CGContext)
     
 }
 
 public class LinePrimitive: Primitive {
     
-    public var lineSegment: SMLineSegment
+    private(set) var lineSegment: SMLineSegment
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(lineSegment: SMLineSegment, strokeSettings: StrokeSettings) {
-        self.lineSegment = lineSegment
+        self.lineSegment = lineSegment.clone()
+        self.boundingBox = lineSegment.boundingBox?.cgRect
         self.strokeSettings = strokeSettings
     }
     
@@ -111,15 +114,22 @@ public class LinePrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setLine(to lineSegment: SMLineSegment) {
+        self.lineSegment = lineSegment.clone()
+        self.boundingBox = lineSegment.boundingBox?.cgRect
+    }
+    
 }
 
 public class ArcPrimitive: Primitive {
     
-    public var arc: SMArc
+    private(set) var arc: SMArc
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(arc: SMArc, strokeSettings: StrokeSettings) {
-        self.arc = arc
+        self.arc = arc.clone()
+        self.boundingBox = arc.boundingBox.cgRect
         self.strokeSettings = strokeSettings
     }
     
@@ -131,16 +141,23 @@ public class ArcPrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setArc(to arc: SMArc) {
+        self.arc = arc.clone()
+        self.boundingBox = arc.boundingBox.cgRect
+    }
+    
 }
 
 public class RectPrimitive: Primitive {
     
-    public var rect: SMRect
+    private(set) var rect: SMRect
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     public init(rect: SMRect, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.rect = rect
+        self.rect = rect.clone()
+        self.boundingBox = rect.cgRect
         self.strokeSettings = strokeSettings
         self.fillSettings = fillSettings
     }
@@ -163,16 +180,23 @@ public class RectPrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setRect(to rect: SMRect) {
+        self.rect = rect.clone()
+        self.boundingBox = rect.cgRect
+    }
+    
 }
 
 public class PolygonPrimitive: Primitive {
     
-    public var polygon: SMPolygon
+    private(set) var polygon: SMPolygon
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     public init(polygon: SMPolygon, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.polygon = polygon
+        self.polygon = polygon.clone()
+        self.boundingBox = polygon.boundingBox?.cgRect
         self.strokeSettings = strokeSettings
         self.fillSettings = fillSettings
     }
@@ -195,15 +219,22 @@ public class PolygonPrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setPolygon(to polygon: SMPolygon) {
+        self.polygon = polygon.clone()
+        self.boundingBox = polygon.boundingBox?.cgRect
+    }
+    
 }
 
 public class PolylinePrimitive: Primitive {
     
-    public var polyline: SMPolyline
+    private(set) var polyline: SMPolyline
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(polyline: SMPolyline, strokeSettings: StrokeSettings) {
-        self.polyline = polyline
+        self.polyline = polyline.clone()
+        self.boundingBox = polyline.boundingBox?.cgRect
         self.strokeSettings = strokeSettings
     }
     
@@ -215,16 +246,68 @@ public class PolylinePrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setPolyline(to polyline: SMPolyline) {
+        self.polyline = polyline.clone()
+        self.boundingBox = polyline.boundingBox?.cgRect
+    }
+    
+}
+
+extension SMQuadCurve {
+    
+    public var boundingBoxApproximate: SMRect {
+        return SMPointCollection(points: [self.origin, self.controlPoint, self.end]).boundingBox!
+    }
+    
+}
+
+extension SMBezierCurve {
+    
+    public var boundingBoxApproximate: SMRect {
+        return SMPointCollection(points: [self.origin, self.originControlPoint, self.end, self.endControlPoint]).boundingBox!
+    }
+    
+}
+
+extension SMCurvilinearEdges {
+    
+    public var boundingBoxApproximate: SMRect? {
+        var boundingBox: SMRect? = nil
+        for line in self.assortedLinearEdges {
+            if boundingBox != nil, let lineBoundingBox = line.boundingBox {
+                boundingBox = boundingBox!.union(lineBoundingBox)
+            }
+        }
+        for arc in self.assortedArcEdges {
+            if boundingBox != nil {
+                boundingBox = boundingBox!.union(arc.boundingBox)
+            }
+        }
+        for quad in self.assortedQuadEdges {
+            if boundingBox != nil {
+                boundingBox = boundingBox!.union(quad.boundingBoxApproximate)
+            }
+        }
+        for bezier in self.assortedBezierEdges {
+            if boundingBox != nil {
+                boundingBox = boundingBox!.union(bezier.boundingBoxApproximate)
+            }
+        }
+        return boundingBox
+    }
+    
 }
 
 public class CurvilinearPrimitive: Primitive {
     
-    public var curvilinear: SMCurvilinearEdges
+    private(set) var curvilinear: SMCurvilinearEdges
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     init(curvilinear: SMCurvilinearEdges, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.curvilinear = curvilinear
+        self.curvilinear = curvilinear.clone()
+        self.boundingBox = curvilinear.boundingBoxApproximate?.cgRect
         self.strokeSettings = strokeSettings
         self.fillSettings = fillSettings
     }
@@ -247,15 +330,22 @@ public class CurvilinearPrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setCurvilinear(to curvilinear: SMCurvilinearEdges) {
+        self.curvilinear = curvilinear.clone()
+        self.boundingBox = curvilinear.boundingBoxApproximate?.cgRect
+    }
+    
 }
 
 public class BezierCurvePrimitive: Primitive {
     
-    public var bezierCurve: SMBezierCurve
+    private(set) var bezierCurve: SMBezierCurve
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(bezierCurve: SMBezierCurve, strokeSettings: StrokeSettings) {
-        self.bezierCurve = bezierCurve
+        self.bezierCurve = bezierCurve.clone()
+        self.boundingBox = bezierCurve.boundingBoxApproximate.cgRect
         self.strokeSettings = strokeSettings
     }
     
@@ -267,15 +357,22 @@ public class BezierCurvePrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setBezierCurve(to bezierCurve: SMBezierCurve) {
+        self.bezierCurve = bezierCurve.clone()
+        self.boundingBox = bezierCurve.boundingBoxApproximate.cgRect
+    }
+    
 }
 
 public class QuadCurvePrimitive: Primitive {
     
-    public var quadCurve: SMQuadCurve
+    private(set) var quadCurve: SMQuadCurve
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(quadCurve: SMQuadCurve, strokeSettings: StrokeSettings) {
-        self.quadCurve = quadCurve
+        self.quadCurve = quadCurve.clone()
+        self.boundingBox = quadCurve.boundingBoxApproximate.cgRect
         self.strokeSettings = strokeSettings
     }
     
@@ -287,16 +384,23 @@ public class QuadCurvePrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setQuadCurve(to quadCurve: SMQuadCurve) {
+        self.quadCurve = quadCurve.clone()
+        self.boundingBox = quadCurve.boundingBoxApproximate.cgRect
+    }
+    
 }
 
 public class EllipsePrimitive: Primitive {
     
-    public var ellipse: SMEllipse
+    private(set) var ellipse: SMEllipse
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     init(ellipse: SMEllipse, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.ellipse = ellipse
+        self.ellipse = ellipse.clone()
+        self.boundingBox = ellipse.boundingBox.cgRect
         self.strokeSettings = strokeSettings
         self.fillSettings = fillSettings
     }
@@ -319,16 +423,23 @@ public class EllipsePrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setEllipse(to ellipse: SMEllipse) {
+        self.ellipse = ellipse.clone()
+        self.boundingBox = ellipse.boundingBox.cgRect
+    }
+    
 }
 
 public class HexagonPrimitive: Primitive {
     
-    public var hexagon: SMHexagon
+    private(set) var hexagon: SMHexagon
+    private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     init(hexagon: SMHexagon, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.hexagon = hexagon
+        self.hexagon = hexagon.clone()
+        self.boundingBox = hexagon.boundingBox.cgRect
         self.strokeSettings = strokeSettings
         self.fillSettings = fillSettings
     }
@@ -351,6 +462,11 @@ public class HexagonPrimitive: Primitive {
         context.restoreGState()
     }
     
+    public func setHexagon(to hexagon: SMHexagon) {
+        self.hexagon = hexagon.clone()
+        self.boundingBox = hexagon.boundingBox.cgRect
+    }
+    
 }
 
 public class CanvasLayer {
@@ -366,9 +482,14 @@ public class CanvasLayer {
         self.primitives.append(primitive)
     }
     
-    internal func draw(on context: CGContext) {
+    internal func draw(on context: CGContext, canvasRect: CGRect?) {
         for primitive in self.primitives {
-            primitive.draw(on: context)
+            if let canvasRect, let boundingBox = primitive.boundingBox, boundingBox.intersects(canvasRect) {
+                // TODO: Primitive bounding boxes need to account for stroke length
+                primitive.draw(on: context)
+            } else if canvasRect == nil {
+                primitive.draw(on: context)
+            }
         }
     }
     
@@ -432,10 +553,13 @@ public class CanvasLayerManager {
     
     // MARK: - Layers
     
-    internal func drawLayers(on context: CGContext) {
+    internal func drawLayers(on context: CGContext, canvasRect: CGRect?, endEarly: (() -> Bool)? = nil) {
         for layerPosition in 0..<self.layerCount {
             let layer = self.layers[layerPosition]!
-            layer.draw(on: context)
+            layer.draw(on: context, canvasRect: canvasRect)
+            if endEarly?() ?? false {
+                return
+            }
         }
     }
     
