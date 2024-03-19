@@ -103,11 +103,6 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         ])
     }
     
-    // MARK: - Hit Target Callbacks
-    
-    private lazy var onHitTargetTapped: ((_ id: String) -> Void)? = nil
-    private lazy var onHitTargetReleased: ((_ id: String) -> Void)? = nil
-    
     // MARK: - Config Functions
     
     @discardableResult
@@ -158,18 +153,6 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         return self
     }
     
-    @discardableResult
-    public func setOnHitTargetTapped(_ callback: ((_ id: String) -> Void)?) -> Self {
-        self.onHitTargetTapped = callback
-        return self
-    }
-    
-    @discardableResult
-    public func setOnHitTargetReleased(_ callback: ((_ id: String) -> Void)?) -> Self {
-        self.onHitTargetReleased = callback
-        return self
-    }
-    
     // MARK: - View Loading Functions
     
     public override func viewDidLoad() {
@@ -204,14 +187,6 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         
         // Setup canvas container
         self.canvasContainer.frame = CGRect(origin: CGPoint(), size: self.canvasSize)
-        
-        // Setup layer manager callbacks
-        self.layerManager.onTap = { id in
-            self.onHitTargetTapped?(id)
-        }
-        self.layerManager.onRelease = { id in
-            self.onHitTargetReleased?(id)
-        }
         
         // Setup complete image
         self.completeImage.frame = self.canvasContainer.frame
@@ -302,14 +277,8 @@ public class CanvasController: UIViewController, UIScrollViewDelegate {
         }
     }
     
-    private func redrawHitTargets() {
-        self.layerManager.eraseHitTargets()
-        self.layerManager.drawHitTargets(to: self.canvasContainer)
-    }
-    
     public func redraw() {
         self.redrawCompleteAsync()
-        self.redrawHitTargets()
         self.refreshCanvas()
     }
     

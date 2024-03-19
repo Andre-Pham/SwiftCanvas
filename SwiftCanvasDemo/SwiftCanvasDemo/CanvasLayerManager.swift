@@ -13,36 +13,6 @@ import UIKit
 // ALSO fix the bug where if you leave the app and come back the scrollview has gone off the canvas
 // ALSO fix the bug where if you zoom out and tap a hit target the canvas glitches
 
-public class TrackedUIControl: UIControl {
-    
-    internal var id: String?
-    
-}
-
-public protocol HitTarget {
-    
-    var id: String { get set }
-    var view: TrackedUIControl { get }
-    
-}
-
-public class HitBox: HitTarget {
-    
-    public var id: String
-    public var box: SMRect
-    public var view: TrackedUIControl {
-        let tappable = TrackedUIControl(frame: self.box.cgRect)
-        tappable.id = self.id
-        return tappable
-    }
-    
-    public init(id: String, box: SMRect) {
-        self.id = id
-        self.box = box
-    }
-    
-}
-
 public class StrokeSettings {
     
     public var color: CGColor
@@ -500,56 +470,6 @@ public class CanvasLayerManager {
     private var layers = [Int: CanvasLayer]()
     private var layerPositions = [String: Int]()
     private(set) var layerCount = 0
-    private var hitTargets = [String: HitTarget]()
-    internal lazy var onTap: ((_ id: String) -> Void)? = nil
-    internal lazy var onRelease: ((_ id: String) -> Void)? = nil
-    
-    // MARK: - Hit Targets
-    
-    internal func eraseHitTargets() {
-        for target in self.hitTargets.values {
-            target.view.removeTarget(nil, action: nil, for: .allEvents)
-            assert(target.view.allTargets.count == 0)
-            target.view.removeFromSuperview()
-        }
-    }
-    
-    internal func drawHitTargets(to view: UIView) {
-        for target in self.hitTargets.values {
-            let targetView = target.view
-            view.addSubview(targetView)
-            targetView.addTarget(self, action: #selector(self.onPressCallback(_:)), for: .touchDown)
-            targetView.addTarget(self, action: #selector(self.onReleaseCallback(_:)), for: [.touchUpInside, .touchUpOutside])
-        }
-    }
-    
-    public func addHitTarget(_ hitTarget: HitTarget) {
-        guard self.hitTargets[hitTarget.id] == nil else {
-            assertionFailure("Cannot add two hit targets with the same id")
-            return
-        }
-        self.hitTargets[hitTarget.id] = hitTarget
-    }
-    
-    @discardableResult
-    public func removeHitTarget(id: String) -> Self {
-        self.hitTargets.removeValue(forKey: id)
-        return self
-    }
-    
-    @discardableResult
-    public func removeAllHitTargets() -> Self {
-        self.hitTargets.removeAll()
-        return self
-    }
-    
-    @objc private func onPressCallback(_ sender: UIControl) {
-        self.onTap?((sender as! TrackedUIControl).id!)
-    }
-    
-    @objc private func onReleaseCallback(_ sender: UIControl) {
-        self.onRelease?((sender as! TrackedUIControl).id!)
-    }
     
     // MARK: - Layers
     
