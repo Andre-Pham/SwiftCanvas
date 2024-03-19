@@ -9,11 +9,10 @@ import Foundation
 import SwiftMath
 import UIKit
 
-// TODO: Add text primitive and ShadowSettings and a tap primitive thing so that I can interact with the canvas via taps
+// TODO: Add text primitive and ShadowSettings
 // ALSO fix the bug where if you leave the app and come back the scrollview has gone off the canvas
-// ALSO fix the bug where if you zoom out and tap a hit target the canvas glitches
 
-public class StrokeSettings {
+public class StrokeSettings: CanvasClonable {
     
     public var color: CGColor
     public var cap: CGLineCap
@@ -32,6 +31,17 @@ public class StrokeSettings {
         self.dash = dash
     }
     
+    public required init(_ original: StrokeSettings) {
+        self.color = original.color
+        self.cap = original.cap
+        self.width = original.width
+        if let dash = original.dash {
+            self.dash = (phase: dash.phase, lengths: Array(dash.lengths))
+        } else {
+            self.dash = nil
+        }
+    }
+    
     internal func apply(to context: CGContext) {
         context.setStrokeColor(self.color)
         context.setLineCap(self.cap)
@@ -43,12 +53,16 @@ public class StrokeSettings {
     
 }
 
-public class FillSettings {
+public class FillSettings: CanvasClonable {
     
     public var color: CGColor
     
     public init(color: CGColor = CGColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)) {
         self.color = color
+    }
+    
+    public required init(_ original: FillSettings) {
+        self.color = original.color
     }
     
     internal func apply(to context: CGContext) {
@@ -60,76 +74,87 @@ public class FillSettings {
 public protocol Primitive {
     
     var boundingBox: CGRect? { get }
+    
     func draw(on context: CGContext)
     
 }
 
 public class LinePrimitive: Primitive {
     
-    private(set) var lineSegment: SMLineSegment
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
-    public var strokeSettings: StrokeSettings
+    private(set) public var strokeSettings: StrokeSettings
     
     public init(lineSegment: SMLineSegment, strokeSettings: StrokeSettings) {
-        self.lineSegment = lineSegment.clone()
-        self.boundingBox = lineSegment.boundingBox?.cgRect
-        self.strokeSettings = strokeSettings
+        self.strokeSettings = strokeSettings.clone()
+        self.path = lineSegment.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.addPath(self.lineSegment.cgPath)
+        context.addPath(self.path)
         context.drawPath(using: .stroke)
         context.restoreGState()
     }
     
     public func setLine(to lineSegment: SMLineSegment) {
-        self.lineSegment = lineSegment.clone()
-        self.boundingBox = lineSegment.boundingBox?.cgRect
+        self.path = lineSegment.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
 }
 
 public class ArcPrimitive: Primitive {
     
-    private(set) var arc: SMArc
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
-    public var strokeSettings: StrokeSettings
+    private(set) public var strokeSettings: StrokeSettings
     
     public init(arc: SMArc, strokeSettings: StrokeSettings) {
-        self.arc = arc.clone()
-        self.boundingBox = arc.boundingBox.cgRect
-        self.strokeSettings = strokeSettings
+        self.strokeSettings = strokeSettings.clone()
+        self.path = arc.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.addPath(self.arc.cgPath)
+        context.addPath(self.path)
         context.drawPath(using: .stroke)
         context.restoreGState()
     }
     
     public func setArc(to arc: SMArc) {
-        self.arc = arc.clone()
-        self.boundingBox = arc.boundingBox.cgRect
+        self.path = arc.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
 }
 
 public class RectPrimitive: Primitive {
     
-    private(set) var rect: SMRect
+    private(set) var path: CGRect
     private(set) public var boundingBox: CGRect?
-    public var strokeSettings: StrokeSettings?
-    public var fillSettings: FillSettings?
+    private(set) public var strokeSettings: StrokeSettings?
+    private(set) public var fillSettings: FillSettings?
     
     public init(rect: SMRect, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.rect = rect.clone()
-        self.boundingBox = rect.cgRect
-        self.strokeSettings = strokeSettings
-        self.fillSettings = fillSettings
+        self.strokeSettings = strokeSettings?.clone()
+        self.fillSettings = fillSettings?.clone()
+        self.path = rect.cgRect
+        self.boundingBox = self.path.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
     public func draw(on context: CGContext) {
@@ -139,7 +164,7 @@ public class RectPrimitive: Primitive {
         context.saveGState()
         self.strokeSettings?.apply(to: context)
         self.fillSettings?.apply(to: context)
-        context.addRect(self.rect.cgRect)
+        context.addRect(self.path)
         if self.strokeSettings != nil && self.fillSettings != nil {
             context.drawPath(using: .fillStroke)
         } else if self.strokeSettings != nil {
@@ -151,24 +176,33 @@ public class RectPrimitive: Primitive {
     }
     
     public func setRect(to rect: SMRect) {
-        self.rect = rect.clone()
-        self.boundingBox = rect.cgRect
+        self.path = rect.cgRect
+        self.boundingBox = self.path.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
+    }
+    
+    public func setFillSettings(to fillSettings: FillSettings) {
+        self.fillSettings = fillSettings.clone()
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
 }
 
 public class PolygonPrimitive: Primitive {
     
-    private(set) var polygon: SMPolygon
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
-    public var strokeSettings: StrokeSettings?
-    public var fillSettings: FillSettings?
+    private(set) public var strokeSettings: StrokeSettings?
+    private(set) public var fillSettings: FillSettings?
     
     public init(polygon: SMPolygon, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.polygon = polygon.clone()
-        self.boundingBox = polygon.boundingBox?.cgRect
-        self.strokeSettings = strokeSettings
-        self.fillSettings = fillSettings
+        self.strokeSettings = strokeSettings?.clone()
+        self.fillSettings = fillSettings?.clone()
+        self.path = polygon.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
     public func draw(on context: CGContext) {
@@ -178,7 +212,7 @@ public class PolygonPrimitive: Primitive {
         context.saveGState()
         self.strokeSettings?.apply(to: context)
         self.fillSettings?.apply(to: context)
-        context.addPath(self.polygon.cgPath)
+        context.addPath(self.path)
         if self.strokeSettings != nil && self.fillSettings != nil {
             context.drawPath(using: .fillStroke)
         } else if self.strokeSettings != nil {
@@ -190,96 +224,65 @@ public class PolygonPrimitive: Primitive {
     }
     
     public func setPolygon(to polygon: SMPolygon) {
-        self.polygon = polygon.clone()
-        self.boundingBox = polygon.boundingBox?.cgRect
+        self.path = polygon.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
+    }
+    
+    public func setFillSettings(to fillSettings: FillSettings) {
+        self.fillSettings = fillSettings.clone()
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
 }
 
 public class PolylinePrimitive: Primitive {
     
-    private(set) var polyline: SMPolyline
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
-    public var strokeSettings: StrokeSettings
+    private(set) public var strokeSettings: StrokeSettings
     
     public init(polyline: SMPolyline, strokeSettings: StrokeSettings) {
-        self.polyline = polyline.clone()
-        self.boundingBox = polyline.boundingBox?.cgRect
-        self.strokeSettings = strokeSettings
+        self.strokeSettings = strokeSettings.clone()
+        self.path = polyline.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.addPath(self.polyline.cgPath)
+        context.addPath(self.path)
         context.drawPath(using: .stroke)
         context.restoreGState()
     }
     
     public func setPolyline(to polyline: SMPolyline) {
-        self.polyline = polyline.clone()
-        self.boundingBox = polyline.boundingBox?.cgRect
+        self.path = polyline.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
-}
-
-extension SMQuadCurve {
-    
-    public var boundingBoxApproximate: SMRect {
-        return SMPointCollection(points: [self.origin, self.controlPoint, self.end]).boundingBox!
-    }
-    
-}
-
-extension SMBezierCurve {
-    
-    public var boundingBoxApproximate: SMRect {
-        return SMPointCollection(points: [self.origin, self.originControlPoint, self.end, self.endControlPoint]).boundingBox!
-    }
-    
-}
-
-extension SMCurvilinearEdges {
-    
-    public var boundingBoxApproximate: SMRect? {
-        var boundingBox: SMRect? = nil
-        for line in self.assortedLinearEdges {
-            if boundingBox != nil, let lineBoundingBox = line.boundingBox {
-                boundingBox = boundingBox!.union(lineBoundingBox)
-            }
-        }
-        for arc in self.assortedArcEdges {
-            if boundingBox != nil {
-                boundingBox = boundingBox!.union(arc.boundingBox)
-            }
-        }
-        for quad in self.assortedQuadEdges {
-            if boundingBox != nil {
-                boundingBox = boundingBox!.union(quad.boundingBoxApproximate)
-            }
-        }
-        for bezier in self.assortedBezierEdges {
-            if boundingBox != nil {
-                boundingBox = boundingBox!.union(bezier.boundingBoxApproximate)
-            }
-        }
-        return boundingBox
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
 }
 
 public class CurvilinearPrimitive: Primitive {
     
-    private(set) var curvilinear: SMCurvilinearEdges
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     init(curvilinear: SMCurvilinearEdges, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.curvilinear = curvilinear.clone()
-        self.boundingBox = curvilinear.boundingBoxApproximate?.cgRect
-        self.strokeSettings = strokeSettings
-        self.fillSettings = fillSettings
+        self.strokeSettings = strokeSettings?.clone()
+        self.fillSettings = fillSettings?.clone()
+        self.path = curvilinear.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
     public func draw(on context: CGContext) {
@@ -289,7 +292,7 @@ public class CurvilinearPrimitive: Primitive {
         context.saveGState()
         self.strokeSettings?.apply(to: context)
         self.fillSettings?.apply(to: context)
-        context.addPath(self.curvilinear.cgPath)
+        context.addPath(self.path)
         if self.strokeSettings != nil && self.fillSettings != nil {
             context.drawPath(using: .fillStroke)
         } else if self.strokeSettings != nil {
@@ -301,78 +304,97 @@ public class CurvilinearPrimitive: Primitive {
     }
     
     public func setCurvilinear(to curvilinear: SMCurvilinearEdges) {
-        self.curvilinear = curvilinear.clone()
-        self.boundingBox = curvilinear.boundingBoxApproximate?.cgRect
+        self.path = curvilinear.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
+    }
+    
+    public func setFillSettings(to fillSettings: FillSettings) {
+        self.fillSettings = fillSettings.clone()
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
 }
 
 public class BezierCurvePrimitive: Primitive {
     
-    private(set) var bezierCurve: SMBezierCurve
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(bezierCurve: SMBezierCurve, strokeSettings: StrokeSettings) {
-        self.bezierCurve = bezierCurve.clone()
-        self.boundingBox = bezierCurve.boundingBoxApproximate.cgRect
-        self.strokeSettings = strokeSettings
+        self.strokeSettings = strokeSettings.clone()
+        self.path = bezierCurve.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.addPath(self.bezierCurve.cgPath)
+        context.addPath(self.path)
         context.drawPath(using: .stroke)
         context.restoreGState()
     }
     
     public func setBezierCurve(to bezierCurve: SMBezierCurve) {
-        self.bezierCurve = bezierCurve.clone()
-        self.boundingBox = bezierCurve.boundingBoxApproximate.cgRect
+        self.path = bezierCurve.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
 }
 
 public class QuadCurvePrimitive: Primitive {
     
-    private(set) var quadCurve: SMQuadCurve
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings
     
     public init(quadCurve: SMQuadCurve, strokeSettings: StrokeSettings) {
-        self.quadCurve = quadCurve.clone()
-        self.boundingBox = quadCurve.boundingBoxApproximate.cgRect
-        self.strokeSettings = strokeSettings
+        self.strokeSettings = strokeSettings.clone()
+        self.path = quadCurve.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
     public func draw(on context: CGContext) {
         context.saveGState()
         self.strokeSettings.apply(to: context)
-        context.addPath(self.quadCurve.cgPath)
+        context.addPath(self.path)
         context.drawPath(using: .stroke)
         context.restoreGState()
     }
     
     public func setQuadCurve(to quadCurve: SMQuadCurve) {
-        self.quadCurve = quadCurve.clone()
-        self.boundingBox = quadCurve.boundingBoxApproximate.cgRect
+        self.path = quadCurve.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -self.strokeSettings.width, dy: -self.strokeSettings.width)
     }
     
 }
 
 public class EllipsePrimitive: Primitive {
     
-    private(set) var ellipse: SMEllipse
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
-    public var strokeSettings: StrokeSettings?
-    public var fillSettings: FillSettings?
+    private(set) public var strokeSettings: StrokeSettings?
+    private(set) public var fillSettings: FillSettings?
     
     init(ellipse: SMEllipse, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.ellipse = ellipse.clone()
-        self.boundingBox = ellipse.boundingBox.cgRect
-        self.strokeSettings = strokeSettings
-        self.fillSettings = fillSettings
+        self.strokeSettings = strokeSettings?.clone()
+        self.fillSettings = fillSettings?.clone()
+        self.path = ellipse.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
     public func draw(on context: CGContext) {
@@ -382,7 +404,7 @@ public class EllipsePrimitive: Primitive {
         context.saveGState()
         self.strokeSettings?.apply(to: context)
         self.fillSettings?.apply(to: context)
-        context.addPath(self.ellipse.cgPath)
+        context.addPath(self.path)
         if self.strokeSettings != nil && self.fillSettings != nil {
             context.drawPath(using: .fillStroke)
         } else if self.strokeSettings != nil {
@@ -394,24 +416,33 @@ public class EllipsePrimitive: Primitive {
     }
     
     public func setEllipse(to ellipse: SMEllipse) {
-        self.ellipse = ellipse.clone()
-        self.boundingBox = ellipse.boundingBox.cgRect
+        self.path = ellipse.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
+    }
+    
+    public func setFillSettings(to fillSettings: FillSettings) {
+        self.fillSettings = fillSettings.clone()
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
 }
 
 public class HexagonPrimitive: Primitive {
     
-    private(set) var hexagon: SMHexagon
+    private(set) var path: CGPath
     private(set) public var boundingBox: CGRect?
     public var strokeSettings: StrokeSettings?
     public var fillSettings: FillSettings?
     
     init(hexagon: SMHexagon, strokeSettings: StrokeSettings? = nil, fillSettings: FillSettings? = nil) {
-        self.hexagon = hexagon.clone()
-        self.boundingBox = hexagon.boundingBox.cgRect
-        self.strokeSettings = strokeSettings
-        self.fillSettings = fillSettings
+        self.strokeSettings = strokeSettings?.clone()
+        self.fillSettings = fillSettings?.clone()
+        self.path = hexagon.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
     public func draw(on context: CGContext) {
@@ -421,7 +452,7 @@ public class HexagonPrimitive: Primitive {
         context.saveGState()
         self.strokeSettings?.apply(to: context)
         self.fillSettings?.apply(to: context)
-        context.addPath(self.hexagon.cgPath)
+        context.addPath(self.path)
         if self.strokeSettings != nil && self.fillSettings != nil {
             context.drawPath(using: .fillStroke)
         } else if self.strokeSettings != nil {
@@ -433,8 +464,17 @@ public class HexagonPrimitive: Primitive {
     }
     
     public func setHexagon(to hexagon: SMHexagon) {
-        self.hexagon = hexagon.clone()
-        self.boundingBox = hexagon.boundingBox.cgRect
+        self.path = hexagon.cgPath
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
+    }
+    
+    public func setFillSettings(to fillSettings: FillSettings) {
+        self.fillSettings = fillSettings.clone()
+    }
+    
+    public func setStrokeSettings(to strokeSettings: StrokeSettings) {
+        self.strokeSettings = strokeSettings.clone()
+        self.boundingBox = self.path.boundingBox.insetBy(dx: -(self.strokeSettings?.width ?? 0.0), dy: -(self.strokeSettings?.width ?? 0.0))
     }
     
 }
@@ -455,7 +495,6 @@ public class CanvasLayer {
     internal func draw(on context: CGContext, canvasRect: CGRect?) {
         for primitive in self.primitives {
             if let canvasRect, let boundingBox = primitive.boundingBox, boundingBox.intersects(canvasRect) {
-                // TODO: Primitive bounding boxes need to account for stroke length
                 primitive.draw(on: context)
             } else if canvasRect == nil {
                 primitive.draw(on: context)
